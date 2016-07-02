@@ -1,0 +1,5 @@
+cm_version: 5.7.1
+mysql_connector_java_ver: 5.1.39
+mysql_root_password: secret
+mysql_cm_password: secret
+mysql_cm_service_password: secret

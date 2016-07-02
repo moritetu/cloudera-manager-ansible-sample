@@ -1,0 +1,7 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: Stop iptables
+      service: name=iptables state=stopped
+    - name: Install libselinux-python
+      yum: name=libselinux-python

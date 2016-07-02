@@ -1,0 +1,83 @@
+---
+# https://www.cloudera.com/documentation/enterprise/5-5-x/topics/cm_ig_install_path_b_auto.html
+
+- name: Install Cloudera Manager Repository
+  template: src=cloudera-manager.repo dest=/etc/yum.repos.d/cloudera-manager.repo owner=root group=root mode=0644
+
+- name: Install Cloudera Manager
+  yum: name={{ item }}
+  with_items:
+    - oracle-j2sdk1.7
+    - cloudera-manager-server
+    - cloudera-manager-daemons
+
+- name: Make directory /usr/share/java
+  file: path=/usr/share/java state=directory owner=root group=root mode=0755
+
+- name: Copy mysql-connector-java to /usr/share/java
+  copy: src=mysql-connector-java-{{ mysql_connector_java_ver }}-bin.jar dest=/usr/share/java/mysql-connector-java.jar
+
+- name: Install MySQL Respository
+  yum: name=http://repo.mysql.com/yum/mysql-5.6-community/el/6/x86_64/mysql-community-release-el6-5.noarch.rpm
+
+- name: Install mysql
+  yum: name={{ item }}
+  with_items:
+    - mysql-community-server
+
+- name: Start mysql
+  service: name=mysqld state=started enabled=yes
+
+- name: Install MySQL-python
+  yum: name=MySQL-python
+
+- name: Check if MySQL is initialized
+  shell: mysql -e "use test;"
+  ignore_errors: True
+  register: prepared_mysql
+
+- name: Remove anonymous user
+  mysql_user: name= state=absent
+  when: prepared_mysql|failed
+
+- name: Remove remote hosts
+  shell: |
+    mysql -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+  when: prepared_mysql|failed
+
+- name: Drop test database
+  shell: |
+    mysql -e "DROP DATABASE IF EXISTS test; DELETE FROM mysql.db WHERE Db = 'test' OR Db='test\\_%';"
+  when: prepared_mysql|failed
+
+- name: Set root password for MySQL
+  mysql_user: name=root password={{ mysql_root_password }}
+
+- name: Write /root/.my.cnf
+  template: src=dot.my.cnf dest=/root/.my.cnf owner=root group=root mode=0600
+
+- name: Create database for cloudera management services
+  mysql_db: name={{ item }} encoding=utf8
+  with_items:
+    - amon
+    - rman
+    - nav
+
+- name: Create users for cloudera management services
+  mysql_user: name={{ item.user }} password={{ item.password }} priv={{ item.user }}.*:ALL host=%
+  with_items:
+    - { user: amon, password: "{{ mysql_cm_service_password }}" }
+    - { user: rman, password: "{{ mysql_cm_service_password }}" }
+    - { user: nav,  password: "{{ mysql_cm_service_password }}" }
+
+- name: Check if scm database exists
+  shell: mysql -e "use scm;"
+  ignore_errors: True
+  register: prepared_scm
+
+- name: Prepare database for Cloudera Manager
+  shell: /usr/share/cmf/schema/scm_prepare_database.sh -uroot -p{{ mysql_root_password }} mysql scm scm {{ mysql_cm_password }}
+  when: prepared_scm|failed
+
+- name: Start Cloudera Manage Server
+  service: name=cloudera-scm-server state=started
