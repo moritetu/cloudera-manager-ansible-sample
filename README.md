@@ -4,10 +4,8 @@ This is a sample to install cloudera manager with ansible on vagrant virtual mac
 
 ## Usage
 
-Download mysql-connector-java.
-
-
-Run vagrant and ansible playbook.
+1. Downloads mysql-connector-java and save it into `roles/cm/files`.
+2. Runs vagrant and ansible playbook.
 
 ```
 $ vagrant plugin install vagrant-hostmanager
